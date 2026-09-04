@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>CKBoard 白板</title>
+<style>
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#fff;
+  font-family:"Microsoft YaHei",system-ui,"PingFang SC",sans-serif;}
+#cv{position:fixed;inset:0;touch-action:none;z-index:1;cursor:crosshair;}
+#bar{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:10;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;
+  background:rgba(28,30,36,0.85);border-radius:12px;padding:6px 10px;
+  box-shadow:0 2px 12px rgba(0,0,0,.35);max-width:97vw;box-sizing:border-box;}
+#bar button,#bar a{min-width:46px;height:42px;padding:0 12px;border:0;border-radius:9px;
+  background:#3a3f4d;color:#fff;font-size:15px;cursor:pointer;text-decoration:none;
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
+#bar button.on,#bar a.on{background:#0a84ff;}
+#bar .sep{width:1px;height:26px;background:rgba(255,255,255,.22);}
+.pen .dot{width:17px;height:17px;border-radius:50%;border:2px solid #fff;box-sizing:border-box;}
+.pen.red .dot{background:#e53935;}
+.pen.black .dot{background:#222;}
+.pen.blue .dot{background:#1e63d0;}
+.eraser .dot{width:15px;height:15px;border-radius:4px;background:#fff;}
+#status{color:#ff6b6b;font-size:13px;white-space:nowrap;padding:0 6px;}
+#status.ok{color:#5bd75b;}
+#hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:10;
+  background:rgba(28,30,36,.78);color:#fff;padding:9px 18px;border-radius:22px;
+  font-size:13px;pointer-events:none;white-space:nowrap;max-width:96vw;text-align:center;}
+#viewerHint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:10;
+  background:rgba(26,60,150,.85);color:#fff;padding:9px 18px;border-radius:22px;
+  font-size:14px;pointer-events:none;white-space:nowrap;max-width:96vw;text-align:center;}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="bar">
+  <span id="tools">
+    <button class="pen red on" data-tool="pen" data-color="#e53935"><span class="dot"></span>红</button>
+    <button class="pen black" data-tool="pen" data-color="#222222"><span class="dot"></span>黑</button>
+    <button class="pen blue" data-tool="pen" data-color="#1e63d0"><span class="dot"></span>蓝</button>
+    <button class="eraser" data-tool="eraser"><span class="dot"></span>擦除</button>
+    <span class="sep"></span>
+    <button id="undo">↩ 撤销</button>
+    <button id="clear">🗑 清空</button>
+  </span>
+  <span class="sep"></span>
+  <button id="pan">✋ 漫游</button>
+  <button id="reset">⟳ 复位</button>
+  <button id="full">⛶ 全屏</button>
+  <a id="tpLink" href="/tp">🖐 触控板</a>
+  <span id="status">○ 未连接</span>
+</div>
+
+<div id="hint" style="display:none">单指书写 · ✋漫游＝单指拖动画布 · 双指缩放/平移 · 滚轮缩放 · 右键平移</div>
+<div id="viewerHint" style="display:none">镜像模式 —— 把这个窗口共享给腾讯会议</div>
+
+<script src="/app.js?v=4"></script>
+</body>
+</html>

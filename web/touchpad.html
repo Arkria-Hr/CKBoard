@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>CKBoard 触控板</title>
+<style>
+html,body{margin:0;padding:0;height:100%;overflow:hidden;
+  font-family:"Microsoft YaHei",system-ui,"PingFang SC",sans-serif;background:#1c1f26;}
+#bar{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;
+  gap:8px;padding:8px 10px;background:#2a2e3a;box-sizing:border-box;}
+#bar button{flex:1;height:48px;border:0;border-radius:9px;background:#3a3f4d;
+  color:#fff;font-size:16px;cursor:pointer;}
+#bar button.on{background:#0a84ff;}
+#status{margin-left:auto;color:#ff6b6b;font-size:14px;white-space:nowrap;padding:0 6px;}
+#status.ok{color:#5bd75b;}
+#pad{position:fixed;top:64px;left:0;right:0;bottom:0;background:#f6f7fb;
+  touch-action:none;
+  background-image:linear-gradient(rgba(0,0,0,.05) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(0,0,0,.05) 1px,transparent 1px);
+  background-size:40px 40px;}
+#hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:10;
+  color:#333;background:rgba(255,255,255,.88);padding:9px 18px;border-radius:18px;
+  font-size:13px;pointer-events:none;white-space:nowrap;max-width:96vw;text-align:center;}
+a#back{position:fixed;top:8px;right:12px;z-index:20;color:#8ab4ff;font-size:13px;
+  text-decoration:none;}
+</style>
+</head>
+<body>
+<a id="back" href="/">← 返回白板</a>
+<div id="bar">
+  <button id="btnDraw" class="on">✏️ 画模式</button>
+  <button id="btnMove">🖐 移动模式</button>
+  <button id="btnRelease">⏏ 松开左键</button>
+  <span id="status">○ 未连接</span>
+</div>
+<div id="pad"></div>
+<div id="hint">手指在下方滑动 → 电脑鼠标跟随。画模式＝按住左键书写；移动模式＝只移动光标</div>
+
+<script>
+(function () {
+'use strict';
+var mode = 'draw';
+var pad = document.getElementById('pad');
+var statusEl = document.getElementById('status');
+var ws = null, retry = 0, closed = false;
+var lastSent = 0, lastPos = null;
+
+function setStatus(ok) {
+    statusEl.className = ok ? 'ok' : '';
+    statusEl.textContent = ok ? '● 已连接' : '○ 未连接';
+}
+function connect() {
+    if (closed) return;
+    var proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(proto + '://' + location.host + '/ws');
+    ws.onopen = function () {
+        retry = 0;
+        setStatus(true);
+        ws.send(JSON.stringify({ t: 'hello', role: 'mouse' }));
+    };
+    ws.onclose = function () {
+        setStatus(false);
+        retry = Math.min(retry + 1, 8);
+        setTimeout(connect, 1000 * retry);
+    };
+    ws.onerror = function () { try { ws.close(); } catch (e) {} };
+}
+function send(obj) {
+    if (ws && ws.readyState === 1) {
+        try { ws.send(JSON.stringify(obj)); return true; } catch (e) { return false; }
+    }
+    return false;
+}
+function norm(ev) {
+    var r = pad.getBoundingClientRect();
+    var x = (ev.clientX - r.left) / r.width;
+    var y = (ev.clientY - r.top) / r.height;
+    x = x < 0 ? 0 : (x > 1 ? 1 : x);
+    y = y < 0 ? 0 : (y > 1 ? 1 : y);
+    return { x: x, y: y };
+}
+function act(a, p) {
+    if (a === 'down') {
+        send({ t: 'mouse', x: p.x, y: p.y, a: 'move' });
+        send({ t: 'mouse', x: p.x, y: p.y, a: 'down' });
+    } else if (a === 'up') {
+        send({ t: 'mouse', x: p.x, y: p.y, a: 'move' });
+        send({ t: 'mouse', x: p.x, y: p.y, a: 'up' });
+    } else {
+        var t = Date.now();
+        if (t - lastSent < 30) return;
+        if (lastPos && Math.abs(lastPos.x - p.x) < 0.003 &&
+            Math.abs(lastPos.y - p.y) < 0.003) return;
+        send({ t: 'mouse', x: p.x, y: p.y, a: 'move' });
+        lastSent = t;
+    }
+    lastPos = p;
+}
+function bind() {
+    if (window.PointerEvent) {
+        pad.addEventListener('pointerdown', function (e) {
+            e.preventDefault();
+            if (mode === 'draw') act('down', norm(e)); else act('move', norm(e));
+        });
+        pad.addEventListener('pointermove', function (e) { act('move', norm(e)); });
+        pad.addEventListener('pointerup', function (e) {
+            if (mode === 'draw') act('up', norm(e));
+        });
+        pad.addEventListener('pointercancel', function () {
+            if (mode === 'draw') send({ t: 'mouse', a: 'up' });
+        });
+    } else {
+        pad.addEventListener('touchstart', function (e) {
+            e.preventDefault();
+            var t = e.changedTouches[0];
+            if (mode === 'draw') act('down', norm(t)); else act('move', norm(t));
+        }, { passive: false });
+        pad.addEventListener('touchmove', function (e) {
+            e.preventDefault();
+            var t = e.changedTouches[0];
+            act('move', norm(t));
+        }, { passive: false });
+        pad.addEventListener('touchend', function (e) {
+            e.preventDefault();
+            var t = e.changedTouches[0];
+            if (mode === 'draw') act('up', norm(t));
+        }, { passive: false });
+        pad.addEventListener('mousedown', function (e) {
+            if (mode === 'draw') act('down', norm(e)); else act('move', norm(e));
+        });
+        window.addEventListener('mousemove', function (e) {
+            if (e.buttons === 0) return;
+            act('move', norm(e));
+        });
+        window.addEventListener('mouseup', function (e) {
+            if (mode === 'draw') act('up', norm(e));
+        });
+    }
+    var bd = document.getElementById('btnDraw'), bm = document.getElementById('btnMove');
+    bd.onclick = function () { mode = 'draw'; bd.className = 'on'; bm.className = ''; };
+    bm.onclick = function () { mode = 'move'; bm.className = 'on'; bd.className = ''; };
+    document.getElementById('btnRelease').onclick = function () {
+        send({ t: 'release' });
+        send({ t: 'mouse', x: 0.5, y: 0.5, a: 'move' });
+    };
+}
+bind();
+connect();
+setStatus(false);
+})();
+</script>
+</body>
+</html>

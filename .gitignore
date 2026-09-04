@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.pyc
+
+# 运行时数据（板书内容保存在本地，不入库）
+data/
+
+# 调试截图
+tests/*.png
